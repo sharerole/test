@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Face</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+
+    #hint {
+      color: #aaa;
+      margin-bottom: 24px;
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      transition: opacity 0.4s;
+    }
+
+    #face-wrapper {
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    svg#face {
+      display: block;
+      filter: drop-shadow(0 0 18px rgba(255, 220, 50, 0.5));
+      transition: filter 0.3s;
+    }
+
+    #face-wrapper.angry svg#face {
+      filter: drop-shadow(0 0 32px rgba(255, 60, 20, 0.85));
+    }
+
+    /* ── face parts ── */
+    #face-bg {
+      transition: fill 0.25s;
+    }
+
+    #left-eye, #right-eye {
+      transition: all 0.2s;
+    }
+
+    #smile {
+      transition: d 0.3s, opacity 0.2s;
+    }
+
+    /* ── explosion particles ── */
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: explode var(--dur) ease-out forwards;
+    }
+
+    @keyframes explode {
+      0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+    }
+
+    /* ── shake animation ── */
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      15%  { transform: translate(-6px, 2px) rotate(-4deg); }
+      30%  { transform: translate(6px, -2px) rotate(4deg); }
+      45%  { transform: translate(-4px, 4px) rotate(-2deg); }
+      60%  { transform: translate(4px, -4px) rotate(2deg); }
+      75%  { transform: translate(-2px, 2px) rotate(-1deg); }
+    }
+
+    #face-wrapper.shaking {
+      animation: shake 0.45s ease-in-out;
+    }
+
+    /* ── veins ── */
+    .vein {
+      stroke: #cc2200;
+      stroke-width: 2.5;
+      fill: none;
+      stroke-linecap: round;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #face-wrapper.angry .vein {
+      opacity: 1;
+    }
+
+    /* ── steam puffs ── */
+    .steam {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.7);
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    #face-wrapper.angry .steam {
+      animation: puff 0.9s ease-out infinite;
+    }
+
+    #steam-l { left: 62px; top: 30px; animation-delay: 0s; }
+    #steam-r { right: 62px; top: 30px; animation-delay: 0.45s; }
+
+    @keyframes puff {
+      0%   { transform: translateY(0) scale(0.6); opacity: 0.8; }
+      100% { transform: translateY(-40px) scale(1.8); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<p id="hint">Click the face!</p>
+
+<div id="face-wrapper">
+  <!-- steam puffs (hidden until angry) -->
+  <div class="steam" id="steam-l"></div>
+  <div class="steam" id="steam-r"></div>
+
+  <svg id="face" width="220" height="220" viewBox="0 0 220 220">
+    <!-- face circle -->
+    <circle id="face-bg" cx="110" cy="110" r="100" fill="#FFD700" stroke="#e6b800" stroke-width="3"/>
+
+    <!-- veins (hidden until angry) -->
+    <path class="vein" id="vein1" d="M70 60 Q60 50 55 40"/>
+    <path class="vein" id="vein2" d="M150 60 Q160 50 165 40"/>
+    <path class="vein" id="vein3" d="M110 55 Q108 42 110 35"/>
+
+    <!-- left eye -->
+    <g id="left-eye">
+      <circle cx="78" cy="88" r="12" fill="#222"/>
+      <circle cx="82" cy="84" r="4" fill="white"/>
+      <!-- angry brow (hidden by default) -->
+      <line id="lbrow" x1="60" y1="68" x2="90" y2="78" stroke="#222" stroke-width="5" stroke-linecap="round" opacity="0"/>
+    </g>
+
+    <!-- right eye -->
+    <g id="right-eye">
+      <circle cx="142" cy="88" r="12" fill="#222"/>
+      <circle cx="146" cy="84" r="4" fill="white"/>
+      <!-- angry brow (hidden by default) -->
+      <line id="rbrow" x1="160" y1="68" x2="130" y2="78" stroke="#222" stroke-width="5" stroke-linecap="round" opacity="0"/>
+    </g>
+
+    <!-- mouth – happy arc path -->
+    <path id="smile" d="M70 135 Q110 175 150 135" stroke="#222" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+    <!-- teeth (shown when angry) -->
+    <g id="teeth" opacity="0">
+      <rect x="88" y="138" width="12" height="12" rx="2" fill="white" stroke="#555" stroke-width="1"/>
+      <rect x="102" y="138" width="12" height="12" rx="2" fill="white" stroke="#555" stroke-width="1"/>
+      <rect x="116" y="138" width="12" height="12" rx="2" fill="white" stroke="#555" stroke-width="1"/>
+    </g>
+
+    <!-- cheeks (happy blush) -->
+    <ellipse id="cheek-l" cx="58" cy="125" rx="18" ry="10" fill="rgba(255,100,100,0.35)"/>
+    <ellipse id="cheek-r" cx="162" cy="125" rx="18" ry="10" fill="rgba(255,100,100,0.35)"/>
+  </svg>
+</div>
+
+<script>
+  const wrapper = document.getElementById('face-wrapper');
+  const faceBg  = document.getElementById('face-bg');
+  const smile   = document.getElementById('smile');
+  const lbrow   = document.getElementById('lbrow');
+  const rbrow   = document.getElementById('rbrow');
+  const teeth   = document.getElementById('teeth');
+  const cheekL  = document.getElementById('cheek-l');
+  const cheekR  = document.getElementById('cheek-r');
+  const hint    = document.getElementById('hint');
+  const leftEyeCircle  = document.querySelector('#left-eye circle');
+  const rightEyeCircle = document.querySelector('#right-eye circle');
+
+  let isAngry = false;
+  let clickCount = 0;
+
+  const HAPPY = {
+    fill:   '#FFD700',
+    stroke: '#e6b800',
+    smile:  'M70 135 Q110 175 150 135',
+    glow:   'drop-shadow(0 0 18px rgba(255, 220, 50, 0.5))',
+    eyeR:   12,
+  };
+
+  const ANGRY = {
+    fill:   '#FF4500',
+    stroke: '#cc2200',
+    smile:  'M70 155 Q110 125 150 155',
+    glow:   'drop-shadow(0 0 32px rgba(255, 60, 20, 0.85))',
+    eyeR:   10,
+  };
+
+  function spawnParticles() {
+    const rect = wrapper.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top  + rect.height / 2;
+    const colors = ['#FF4500','#FF6A00','#FFD700','#FF0000','#FFA500','#FFEC00'];
+    const count = 28;
+
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const dist  = 80 + Math.random() * 120;
+      const size  = 6 + Math.random() * 12;
+      const dur   = 0.5 + Math.random() * 0.5;
+      p.style.cssText = `
+        left: ${cx - size/2}px;
+        top:  ${cy - size/2}px;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${colors[Math.floor(Math.random() * colors.length)]};
+        --tx: ${Math.cos(angle) * dist}px;
+        --ty: ${Math.sin(angle) * dist}px;
+        --dur: ${dur}s;
+        position: fixed;
+      `;
+      document.body.appendChild(p);
+      p.addEventListener('animationend', () => p.remove());
+    }
+  }
+
+  function goAngry() {
+    faceBg.setAttribute('fill', ANGRY.fill);
+    faceBg.setAttribute('stroke', ANGRY.stroke);
+    smile.setAttribute('d', ANGRY.smile);
+    lbrow.setAttribute('opacity', '1');
+    rbrow.setAttribute('opacity', '1');
+    teeth.setAttribute('opacity', '1');
+    cheekL.setAttribute('fill', 'rgba(180,0,0,0.0)');
+    cheekR.setAttribute('fill', 'rgba(180,0,0,0.0)');
+    leftEyeCircle.setAttribute('r',  ANGRY.eyeR);
+    rightEyeCircle.setAttribute('r', ANGRY.eyeR);
+    wrapper.classList.add('angry');
+    spawnParticles();
+  }
+
+  function goHappy() {
+    faceBg.setAttribute('fill', HAPPY.fill);
+    faceBg.setAttribute('stroke', HAPPY.stroke);
+    smile.setAttribute('d', HAPPY.smile);
+    lbrow.setAttribute('opacity', '0');
+    rbrow.setAttribute('opacity', '0');
+    teeth.setAttribute('opacity', '0');
+    cheekL.setAttribute('fill', 'rgba(255,100,100,0.35)');
+    cheekR.setAttribute('fill', 'rgba(255,100,100,0.35)');
+    leftEyeCircle.setAttribute('r',  HAPPY.eyeR);
+    rightEyeCircle.setAttribute('r', HAPPY.eyeR);
+    wrapper.classList.remove('angry');
+  }
+
+  wrapper.addEventListener('click', () => {
+    clickCount++;
+    if (clickCount === 1) hint.style.opacity = '0';
+
+    // trigger shake regardless
+    wrapper.classList.remove('shaking');
+    void wrapper.offsetWidth; // reflow to restart animation
+    wrapper.classList.add('shaking');
+    wrapper.addEventListener('animationend', () => wrapper.classList.remove('shaking'), { once: true });
+
+    isAngry = !isAngry;
+    isAngry ? goAngry() : goHappy();
+  });
+</script>
+</body>
+</html>
