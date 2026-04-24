@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Face</title>
+  <title>Whack-a-Smiley</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -12,52 +12,94 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       min-height: 100vh;
       font-family: sans-serif;
       overflow: hidden;
+      padding-top: 20px;
     }
 
-    #hint {
-      color: #aaa;
-      margin-bottom: 24px;
-      font-size: 1rem;
+    h1 {
+      color: #FFD700;
+      font-size: 2rem;
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 20px rgba(255, 220, 50, 0.6);
+      margin-bottom: 12px;
+    }
+
+    #hud {
+      display: flex;
+      gap: 48px;
+      margin-bottom: 20px;
+      color: #eee;
+      font-size: 1.2rem;
+    }
+
+    #hud span { color: #FFD700; font-weight: bold; }
+
+    #start-btn {
+      background: #FFD700;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 24px;
+      padding: 10px 32px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 20px;
+      transition: background 0.2s, transform 0.1s;
       letter-spacing: 0.05em;
-      transition: opacity 0.4s;
     }
 
-    #face-wrapper {
+    #start-btn:hover { background: #ffe033; transform: scale(1.05); }
+    #start-btn:active { transform: scale(0.97); }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(3, 130px);
+      grid-template-rows: repeat(3, 130px);
+      gap: 20px;
+    }
+
+    .hole {
       position: relative;
+      width: 130px;
+      height: 130px;
+      background: radial-gradient(ellipse at 50% 60%, #2c1a0e 60%, #1a0e08 100%);
+      border-radius: 50%;
+      border: 4px solid #4a2c10;
+      box-shadow: inset 0 8px 20px rgba(0,0,0,0.7), 0 4px 10px rgba(0,0,0,0.5);
+      overflow: hidden;
+      cursor: default;
+    }
+
+    .face-wrapper {
+      position: absolute;
+      left: 50%;
+      bottom: -110%;
+      transform: translateX(-50%);
       cursor: pointer;
       user-select: none;
+      transition: bottom 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    svg#face {
+    .face-wrapper.up {
+      bottom: -5%;
+    }
+
+    .face-wrapper.whacked {
+      bottom: -110%;
+      transition: bottom 0.18s ease-in;
+    }
+
+    .face-wrapper svg {
       display: block;
-      filter: drop-shadow(0 0 18px rgba(255, 220, 50, 0.5));
-      transition: filter 0.3s;
+      filter: drop-shadow(0 0 14px rgba(255, 220, 50, 0.5));
     }
 
-    #face-wrapper.angry svg#face {
-      filter: drop-shadow(0 0 32px rgba(255, 60, 20, 0.85));
-    }
-
-    /* ── face parts ── */
-    #face-bg {
-      transition: fill 0.25s;
-    }
-
-    #left-eye, #right-eye {
-      transition: all 0.2s;
-    }
-
-    #smile {
-      transition: d 0.3s, opacity 0.2s;
-    }
-
-    /* ── explosion particles ── */
+    /* particle explosion */
     .particle {
-      position: absolute;
+      position: fixed;
       border-radius: 50%;
       pointer-events: none;
       animation: explode var(--dur) ease-out forwards;
@@ -68,212 +110,472 @@
       100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
     }
 
-    /* ── shake animation ── */
-    @keyframes shake {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      15%  { transform: translate(-6px, 2px) rotate(-4deg); }
-      30%  { transform: translate(6px, -2px) rotate(4deg); }
-      45%  { transform: translate(-4px, 4px) rotate(-2deg); }
-      60%  { transform: translate(4px, -4px) rotate(2deg); }
-      75%  { transform: translate(-2px, 2px) rotate(-1deg); }
+    /* pop-in bounce */
+    @keyframes bop {
+      0%   { transform: translateX(-50%) scale(1); }
+      30%  { transform: translateX(-50%) scale(1.18, 0.88); }
+      60%  { transform: translateX(-50%) scale(0.92, 1.08); }
+      80%  { transform: translateX(-50%) scale(1.06, 0.96); }
+      100% { transform: translateX(-50%) scale(1); }
     }
 
-    #face-wrapper.shaking {
-      animation: shake 0.45s ease-in-out;
+    .face-wrapper.popping {
+      animation: bop 0.4s ease-out;
     }
 
-    /* ── veins ── */
-    .vein {
-      stroke: #cc2200;
-      stroke-width: 2.5;
-      fill: none;
-      stroke-linecap: round;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    #face-wrapper.angry .vein {
-      opacity: 1;
-    }
-
-    /* ── steam puffs ── */
-    .steam {
-      position: absolute;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.7);
+    /* score flash */
+    .score-pop {
+      position: fixed;
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: #FFD700;
+      text-shadow: 0 0 10px rgba(255,220,50,0.8);
       pointer-events: none;
-      opacity: 0;
+      animation: scoreFloat 0.9s ease-out forwards;
     }
 
-    #face-wrapper.angry .steam {
-      animation: puff 0.9s ease-out infinite;
+    @keyframes scoreFloat {
+      0%   { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-60px); }
     }
 
-    #steam-l { left: 62px; top: 30px; animation-delay: 0s; }
-    #steam-r { right: 62px; top: 30px; animation-delay: 0.45s; }
-
-    @keyframes puff {
-      0%   { transform: translateY(0) scale(0.6); opacity: 0.8; }
-      100% { transform: translateY(-40px) scale(1.8); opacity: 0; }
+    #game-over {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10,10,20,0.85);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 18px;
+      z-index: 100;
     }
+
+    #game-over.show { display: flex; }
+
+    #game-over h2 {
+      color: #FFD700;
+      font-size: 3rem;
+      text-shadow: 0 0 30px rgba(255,220,50,0.7);
+    }
+
+    #game-over p {
+      color: #eee;
+      font-size: 1.4rem;
+    }
+
+    #game-over button {
+      background: #FFD700;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 24px;
+      padding: 12px 40px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    #game-over button:hover { background: #ffe033; transform: scale(1.05); }
   </style>
 </head>
 <body>
 
-<p id="hint">Click the face!</p>
+<h1>Whack-a-Smiley!</h1>
 
-<div id="face-wrapper">
-  <!-- steam puffs (hidden until angry) -->
-  <div class="steam" id="steam-l"></div>
-  <div class="steam" id="steam-r"></div>
+<div id="hud">
+  <div>Score: <span id="score-display">0</span></div>
+  <div>Time: <span id="timer-display">30</span>s</div>
+  <div>Best: <span id="best-display">0</span></div>
+</div>
 
-  <svg id="face" width="220" height="220" viewBox="0 0 220 220">
-    <!-- face circle -->
-    <circle id="face-bg" cx="110" cy="110" r="100" fill="#FFD700" stroke="#e6b800" stroke-width="3"/>
+<button id="start-btn">Start Game</button>
 
-    <!-- veins (hidden until angry) -->
-    <path class="vein" id="vein1" d="M70 60 Q60 50 55 40"/>
-    <path class="vein" id="vein2" d="M150 60 Q160 50 165 40"/>
-    <path class="vein" id="vein3" d="M110 55 Q108 42 110 35"/>
+<div id="grid"></div>
 
-    <!-- left eye -->
-    <g id="left-eye">
-      <circle cx="78" cy="88" r="12" fill="#222"/>
-      <circle cx="82" cy="84" r="4" fill="white"/>
-      <!-- angry brow (hidden by default) -->
-      <line id="lbrow" x1="60" y1="68" x2="90" y2="78" stroke="#222" stroke-width="5" stroke-linecap="round" opacity="0"/>
-    </g>
-
-    <!-- right eye -->
-    <g id="right-eye">
-      <circle cx="142" cy="88" r="12" fill="#222"/>
-      <circle cx="146" cy="84" r="4" fill="white"/>
-      <!-- angry brow (hidden by default) -->
-      <line id="rbrow" x1="160" y1="68" x2="130" y2="78" stroke="#222" stroke-width="5" stroke-linecap="round" opacity="0"/>
-    </g>
-
-    <!-- mouth – happy arc path -->
-    <path id="smile" d="M70 135 Q110 175 150 135" stroke="#222" stroke-width="5" fill="none" stroke-linecap="round"/>
-
-    <!-- teeth (shown when angry) -->
-    <g id="teeth" opacity="0">
-      <rect x="88" y="138" width="12" height="12" rx="2" fill="white" stroke="#555" stroke-width="1"/>
-      <rect x="102" y="138" width="12" height="12" rx="2" fill="white" stroke="#555" stroke-width="1"/>
-      <rect x="116" y="138" width="12" height="12" rx="2" fill="white" stroke="#555" stroke-width="1"/>
-    </g>
-
-    <!-- cheeks (happy blush) -->
-    <ellipse id="cheek-l" cx="58" cy="125" rx="18" ry="10" fill="rgba(255,100,100,0.35)"/>
-    <ellipse id="cheek-r" cx="162" cy="125" rx="18" ry="10" fill="rgba(255,100,100,0.35)"/>
-  </svg>
+<div id="game-over">
+  <h2>Time's Up!</h2>
+  <p>You scored <span id="final-score">0</span> points!</p>
+  <button id="play-again-btn">Play Again</button>
 </div>
 
 <script>
-  const wrapper = document.getElementById('face-wrapper');
-  const faceBg  = document.getElementById('face-bg');
-  const smile   = document.getElementById('smile');
-  const lbrow   = document.getElementById('lbrow');
-  const rbrow   = document.getElementById('rbrow');
-  const teeth   = document.getElementById('teeth');
-  const cheekL  = document.getElementById('cheek-l');
-  const cheekR  = document.getElementById('cheek-r');
-  const hint    = document.getElementById('hint');
-  const leftEyeCircle  = document.querySelector('#left-eye circle');
-  const rightEyeCircle = document.querySelector('#right-eye circle');
+  const HOLE_COUNT = 9;
+  const GAME_DURATION = 30;
 
-  let isAngry = false;
-  let clickCount = 0;
+  let score = 0;
+  let best = 0;
+  let timeLeft = GAME_DURATION;
+  let running = false;
+  let timerId = null;
+  let popTimers = [];
 
-  const HAPPY = {
-    fill:   '#FFD700',
-    stroke: '#e6b800',
-    smile:  'M70 135 Q110 175 150 135',
-    glow:   'drop-shadow(0 0 18px rgba(255, 220, 50, 0.5))',
-    eyeR:   12,
-  };
+  const scoreDisplay    = document.getElementById('score-display');
+  const timerDisplay    = document.getElementById('timer-display');
+  const bestDisplay     = document.getElementById('best-display');
+  const finalScore      = document.getElementById('final-score');
+  const startBtn        = document.getElementById('start-btn');
+  const playAgainBtn    = document.getElementById('play-again-btn');
+  const gameOverScreen  = document.getElementById('game-over');
+  const grid            = document.getElementById('grid');
 
-  const ANGRY = {
-    fill:   '#FF4500',
-    stroke: '#cc2200',
-    smile:  'M70 155 Q110 125 150 155',
-    glow:   'drop-shadow(0 0 32px rgba(255, 60, 20, 0.85))',
-    eyeR:   10,
-  };
+  // ── SVG face builder ──────────────────────────────────────────────────────
 
-  function spawnParticles() {
-    const rect = wrapper.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top  + rect.height / 2;
-    const colors = ['#FF4500','#FF6A00','#FFD700','#FF0000','#FFA500','#FFEC00'];
-    const count = 28;
+  function makeFaceSVG(variant) {
+    const ns = 'http://www.w3.org/2000/svg';
 
-    for (let i = 0; i < count; i++) {
+    const configs = {
+      happy: {
+        fill: '#FFD700', stroke: '#e6b800',
+        smile: 'M38 72 Q55 90 72 72',
+        eyeColor: '#222', eyeR: 7, eyeHighR: 2.5,
+        cheek: 'rgba(255,100,100,0.35)',
+        glow: 'drop-shadow(0 0 14px rgba(255,220,50,0.6))',
+        brow: false,
+      },
+      cool: {
+        fill: '#00CFFF', stroke: '#009ac4',
+        smile: 'M38 72 Q55 88 72 72',
+        eyeColor: '#111', eyeR: 7, eyeHighR: 2.5,
+        cheek: 'rgba(0,180,255,0.18)',
+        glow: 'drop-shadow(0 0 14px rgba(0,200,255,0.6))',
+        brow: false,
+        glasses: true,
+      },
+      wink: {
+        fill: '#FFB347', stroke: '#cc8800',
+        smile: 'M38 72 Q55 90 72 72',
+        eyeColor: '#222', eyeR: 7, eyeHighR: 2.5,
+        cheek: 'rgba(255,140,50,0.35)',
+        glow: 'drop-shadow(0 0 14px rgba(255,180,50,0.6))',
+        brow: false,
+        wink: true,
+      },
+      sleepy: {
+        fill: '#B8A9E0', stroke: '#7b69b8',
+        smile: 'M42 75 Q55 80 68 75',
+        eyeColor: '#333', eyeR: 5, eyeHighR: 2,
+        cheek: 'rgba(180,160,220,0.3)',
+        glow: 'drop-shadow(0 0 14px rgba(170,140,230,0.6))',
+        brow: false,
+        halfEyes: true,
+      },
+      love: {
+        fill: '#FF6B9D', stroke: '#cc3370',
+        smile: 'M38 70 Q55 92 72 70',
+        eyeColor: '#cc0044', eyeR: 8, eyeHighR: 3,
+        cheek: 'rgba(255,80,120,0.4)',
+        glow: 'drop-shadow(0 0 18px rgba(255,100,150,0.7))',
+        brow: false,
+        hearts: true,
+      },
+      silly: {
+        fill: '#98FB98', stroke: '#3cb371',
+        smile: 'M35 68 Q55 100 75 68',
+        eyeColor: '#222', eyeR: 7, eyeHighR: 2.5,
+        cheek: 'rgba(80,200,80,0.3)',
+        glow: 'drop-shadow(0 0 14px rgba(100,220,100,0.6))',
+        brow: false,
+        tongue: true,
+      },
+      dizzy: {
+        fill: '#FFA07A', stroke: '#cc5533',
+        smile: 'M42 74 Q55 72 68 74',
+        eyeColor: '#333', eyeR: 7, eyeHighR: 2,
+        cheek: 'rgba(255,120,80,0.3)',
+        glow: 'drop-shadow(0 0 14px rgba(255,130,80,0.6))',
+        brow: false,
+        dizzyEyes: true,
+      },
+      angry: {
+        fill: '#FF4500', stroke: '#cc2200',
+        smile: 'M38 82 Q55 65 72 82',
+        eyeColor: '#111', eyeR: 6, eyeHighR: 2,
+        cheek: 'rgba(0,0,0,0)',
+        glow: 'drop-shadow(0 0 18px rgba(255,60,20,0.8))',
+        brow: true,
+      },
+      star: {
+        fill: '#FFE066', stroke: '#ccaa00',
+        smile: 'M38 72 Q55 92 72 72',
+        eyeColor: '#222', eyeR: 7, eyeHighR: 2.5,
+        cheek: 'rgba(255,220,50,0.35)',
+        glow: 'drop-shadow(0 0 22px rgba(255,230,50,0.9))',
+        brow: false,
+        starEyes: true,
+      },
+    };
+
+    const cfg = configs[variant] || configs.happy;
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', '110');
+    svg.setAttribute('height', '110');
+    svg.setAttribute('viewBox', '0 0 110 110');
+    svg.style.filter = cfg.glow;
+
+    function el(tag, attrs) {
+      const e = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      return e;
+    }
+
+    // face circle
+    svg.appendChild(el('circle', { cx:55, cy:55, r:50, fill:cfg.fill, stroke:cfg.stroke, 'stroke-width':3 }));
+
+    // cheeks
+    svg.appendChild(el('ellipse', { cx:28, cy:68, rx:12, ry:7, fill:cfg.cheek }));
+    svg.appendChild(el('ellipse', { cx:82, cy:68, rx:12, ry:7, fill:cfg.cheek }));
+
+    // glasses overlay
+    if (cfg.glasses) {
+      const glassG = document.createElementNS(ns, 'g');
+      glassG.appendChild(el('rect',   { x:20, y:36, width:28, height:18, rx:8, ry:8, fill:'none', stroke:'#333', 'stroke-width':2.5 }));
+      glassG.appendChild(el('rect',   { x:62, y:36, width:28, height:18, rx:8, ry:8, fill:'none', stroke:'#333', 'stroke-width':2.5 }));
+      glassG.appendChild(el('line',   { x1:48, y1:45, x2:62, y2:45, stroke:'#333', 'stroke-width':2 }));
+      glassG.appendChild(el('line',   { x1:20, y1:45, x2:13, y2:42, stroke:'#333', 'stroke-width':2 }));
+      glassG.appendChild(el('line',   { x1:90, y1:45, x2:97, y2:42, stroke:'#333', 'stroke-width':2 }));
+      svg.appendChild(glassG);
+    }
+
+    // eyes
+    if (cfg.dizzyEyes) {
+      const drawX = (cx, cy) => {
+        const g = document.createElementNS(ns, 'g');
+        g.appendChild(el('line', { x1:cx-7, y1:cy-7, x2:cx+7, y2:cy+7, stroke:'#333', 'stroke-width':3, 'stroke-linecap':'round' }));
+        g.appendChild(el('line', { x1:cx+7, y1:cy-7, x2:cx-7, y2:cy+7, stroke:'#333', 'stroke-width':3, 'stroke-linecap':'round' }));
+        return g;
+      };
+      svg.appendChild(drawX(36, 42));
+      svg.appendChild(drawX(74, 42));
+    } else if (cfg.halfEyes) {
+      const drawHalf = (cx, cy) => {
+        const g = document.createElementNS(ns, 'g');
+        g.appendChild(el('circle', { cx, cy, r:cfg.eyeR, fill:cfg.eyeColor }));
+        g.appendChild(el('rect',   { x:cx-cfg.eyeR-1, y:cy-1, width:cfg.eyeR*2+2, height:cfg.eyeR+2, fill:cfg.fill }));
+        return g;
+      };
+      svg.appendChild(drawHalf(36, 42));
+      svg.appendChild(drawHalf(74, 42));
+    } else if (cfg.starEyes) {
+      const starPath = (cx, cy, r, pts=5) => {
+        let d = '';
+        for (let i = 0; i < pts * 2; i++) {
+          const a = (i * Math.PI) / pts - Math.PI / 2;
+          const rad = i % 2 === 0 ? r : r * 0.4;
+          const x = cx + Math.cos(a) * rad;
+          const y = cy + Math.sin(a) * rad;
+          d += (i === 0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2);
+        }
+        return d + 'Z';
+      };
+      svg.appendChild(el('path', { d: starPath(36, 42, 9), fill:'#FFD700', stroke:'#cc9900', 'stroke-width':1 }));
+      svg.appendChild(el('path', { d: starPath(74, 42, 9), fill:'#FFD700', stroke:'#cc9900', 'stroke-width':1 }));
+    } else if (cfg.hearts) {
+      const heartPath = (cx, cy) =>
+        `M${cx} ${cy+4} C${cx-8} ${cy-4} ${cx-14} ${cy+2} ${cx} ${cy+12} C${cx+14} ${cy+2} ${cx+8} ${cy-4} ${cx} ${cy+4}Z`;
+      svg.appendChild(el('path', { d: heartPath(36, 34), fill:'#cc0044' }));
+      svg.appendChild(el('path', { d: heartPath(74, 34), fill:'#cc0044' }));
+    } else {
+      // normal eyes
+      svg.appendChild(el('circle', { cx:36, cy:42, r:cfg.eyeR, fill:cfg.eyeColor }));
+      svg.appendChild(el('circle', { cx:36+4, cy:42-3, r:cfg.eyeHighR, fill:'white' }));
+      if (cfg.wink) {
+        // wink: right eye closed
+        svg.appendChild(el('line', { x1:67, y1:42, x2:81, y2:42, stroke:'#222', 'stroke-width':4, 'stroke-linecap':'round' }));
+      } else {
+        svg.appendChild(el('circle', { cx:74, cy:42, r:cfg.eyeR, fill:cfg.eyeColor }));
+        svg.appendChild(el('circle', { cx:74+4, cy:42-3, r:cfg.eyeHighR, fill:'white' }));
+      }
+    }
+
+    // glasses lenses on top of eyes for cool
+    if (cfg.glasses) {
+      // already drawn above with transparent fill so eyes show through
+    }
+
+    // angry brows
+    if (cfg.brow) {
+      svg.appendChild(el('line', { x1:22, y1:30, x2:46, y2:40, stroke:'#111', 'stroke-width':4, 'stroke-linecap':'round' }));
+      svg.appendChild(el('line', { x1:88, y1:30, x2:64, y2:40, stroke:'#111', 'stroke-width':4, 'stroke-linecap':'round' }));
+    }
+
+    // mouth
+    svg.appendChild(el('path', { d:cfg.smile, stroke:'#222', 'stroke-width':4, fill:'none', 'stroke-linecap':'round' }));
+
+    // tongue (silly)
+    if (cfg.tongue) {
+      const tg = document.createElementNS(ns, 'g');
+      tg.appendChild(el('ellipse', { cx:55, cy:86, rx:10, ry:8, fill:'#ff6680' }));
+      tg.appendChild(el('line',    { x1:55, y1:78, x2:55, y2:92, stroke:'#cc3355', 'stroke-width':2 }));
+      svg.appendChild(tg);
+    }
+
+    // sleepy Z
+    if (cfg.halfEyes) {
+      svg.appendChild(el('text', { x:72, y:30, fill:'#7b69b8', 'font-size':14, 'font-weight':'bold', 'font-family':'sans-serif' })).textContent = 'z';
+      svg.appendChild(el('text', { x:80, y:22, fill:'#7b69b8', 'font-size':18, 'font-weight':'bold', 'font-family':'sans-serif' })).textContent = 'Z';
+    }
+
+    return svg;
+  }
+
+  // ── build holes ────────────────────────────────────────────────────────────
+
+  const holes = [];
+  const VARIANTS = ['happy','cool','wink','sleepy','love','silly','dizzy','angry','star'];
+
+  for (let i = 0; i < HOLE_COUNT; i++) {
+    const hole = document.createElement('div');
+    hole.className = 'hole';
+
+    const fw = document.createElement('div');
+    fw.className = 'face-wrapper';
+
+    const variant = VARIANTS[i % VARIANTS.length];
+    fw.appendChild(makeFaceSVG(variant));
+
+    hole.appendChild(fw);
+    grid.appendChild(hole);
+
+    holes.push({ hole, fw, up: false, timer: null, variant });
+  }
+
+  // ── whack handler ──────────────────────────────────────────────────────────
+
+  function spawnParticles(x, y, color) {
+    const colors = [color, '#FFD700', '#FFF', '#FF6B9D', '#00CFFF'];
+    for (let i = 0; i < 18; i++) {
       const p = document.createElement('div');
       p.className = 'particle';
-      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const dist  = 80 + Math.random() * 120;
-      const size  = 6 + Math.random() * 12;
-      const dur   = 0.5 + Math.random() * 0.5;
+      const angle = Math.random() * Math.PI * 2;
+      const dist  = 40 + Math.random() * 70;
+      const size  = 5 + Math.random() * 8;
+      const dur   = 0.35 + Math.random() * 0.35;
       p.style.cssText = `
-        left: ${cx - size/2}px;
-        top:  ${cy - size/2}px;
-        width: ${size}px;
-        height: ${size}px;
-        background: ${colors[Math.floor(Math.random() * colors.length)]};
-        --tx: ${Math.cos(angle) * dist}px;
-        --ty: ${Math.sin(angle) * dist}px;
-        --dur: ${dur}s;
-        position: fixed;
+        left:${x - size/2}px; top:${y - size/2}px;
+        width:${size}px; height:${size}px;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        --tx:${Math.cos(angle)*dist}px; --ty:${Math.sin(angle)*dist}px; --dur:${dur}s;
       `;
       document.body.appendChild(p);
       p.addEventListener('animationend', () => p.remove());
     }
   }
 
-  function goAngry() {
-    faceBg.setAttribute('fill', ANGRY.fill);
-    faceBg.setAttribute('stroke', ANGRY.stroke);
-    smile.setAttribute('d', ANGRY.smile);
-    lbrow.setAttribute('opacity', '1');
-    rbrow.setAttribute('opacity', '1');
-    teeth.setAttribute('opacity', '1');
-    cheekL.setAttribute('fill', 'rgba(180,0,0,0.0)');
-    cheekR.setAttribute('fill', 'rgba(180,0,0,0.0)');
-    leftEyeCircle.setAttribute('r',  ANGRY.eyeR);
-    rightEyeCircle.setAttribute('r', ANGRY.eyeR);
-    wrapper.classList.add('angry');
-    spawnParticles();
+  function showScorePop(x, y, pts) {
+    const el = document.createElement('div');
+    el.className = 'score-pop';
+    el.textContent = '+' + pts;
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
   }
 
-  function goHappy() {
-    faceBg.setAttribute('fill', HAPPY.fill);
-    faceBg.setAttribute('stroke', HAPPY.stroke);
-    smile.setAttribute('d', HAPPY.smile);
-    lbrow.setAttribute('opacity', '0');
-    rbrow.setAttribute('opacity', '0');
-    teeth.setAttribute('opacity', '0');
-    cheekL.setAttribute('fill', 'rgba(255,100,100,0.35)');
-    cheekR.setAttribute('fill', 'rgba(255,100,100,0.35)');
-    leftEyeCircle.setAttribute('r',  HAPPY.eyeR);
-    rightEyeCircle.setAttribute('r', HAPPY.eyeR);
-    wrapper.classList.remove('angry');
+  function whack(h, evt) {
+    if (!running || !h.up) return;
+    h.up = false;
+    clearTimeout(h.timer);
+
+    score++;
+    scoreDisplay.textContent = score;
+
+    const rect = h.fw.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top  + rect.height / 2;
+
+    spawnParticles(cx, cy, '#FFD700');
+    showScorePop(cx - 10, cy - 20, 1);
+
+    h.fw.classList.remove('up', 'popping');
+    h.fw.classList.add('whacked');
+
+    h.fw.addEventListener('transitionend', () => {
+      h.fw.classList.remove('whacked');
+      if (running) scheduleNext(h, 300 + Math.random() * 600);
+    }, { once: true });
+
+    evt.stopPropagation();
   }
 
-  wrapper.addEventListener('click', () => {
-    clickCount++;
-    if (clickCount === 1) hint.style.opacity = '0';
-
-    // trigger shake regardless
-    wrapper.classList.remove('shaking');
-    void wrapper.offsetWidth; // reflow to restart animation
-    wrapper.classList.add('shaking');
-    wrapper.addEventListener('animationend', () => wrapper.classList.remove('shaking'), { once: true });
-
-    isAngry = !isAngry;
-    isAngry ? goAngry() : goHappy();
+  holes.forEach(h => {
+    h.fw.addEventListener('click', evt => whack(h, evt));
+    h.fw.addEventListener('touchstart', evt => { evt.preventDefault(); whack(h, evt); }, { passive: false });
   });
+
+  // ── pop logic ─────────────────────────────────────────────────────────────
+
+  function popUp(h) {
+    if (!running) return;
+    h.up = true;
+    h.fw.classList.remove('whacked');
+    h.fw.classList.add('up', 'popping');
+    h.fw.addEventListener('animationend', () => h.fw.classList.remove('popping'), { once: true });
+
+    const stayMs = 1200 + Math.random() * 1400;
+    h.timer = setTimeout(() => popDown(h), stayMs);
+  }
+
+  function popDown(h) {
+    if (!h.up) return;
+    h.up = false;
+    h.fw.classList.remove('up', 'popping');
+    if (running) scheduleNext(h, 400 + Math.random() * 800);
+  }
+
+  function scheduleNext(h, delay) {
+    clearTimeout(h.timer);
+    h.timer = setTimeout(() => popUp(h), delay);
+    popTimers.push(h.timer);
+  }
+
+  // ── game control ───────────────────────────────────────────────────────────
+
+  function startGame() {
+    score = 0;
+    timeLeft = GAME_DURATION;
+    scoreDisplay.textContent = '0';
+    timerDisplay.textContent = GAME_DURATION;
+    gameOverScreen.classList.remove('show');
+    startBtn.style.display = 'none';
+    running = true;
+
+    // stagger initial pops
+    holes.forEach((h, i) => {
+      scheduleNext(h, 200 + i * 250 + Math.random() * 400);
+    });
+
+    timerId = setInterval(() => {
+      timeLeft--;
+      timerDisplay.textContent = timeLeft;
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+  }
+
+  function endGame() {
+    running = false;
+    clearInterval(timerId);
+    popTimers.forEach(t => clearTimeout(t));
+    popTimers = [];
+
+    holes.forEach(h => {
+      clearTimeout(h.timer);
+      h.up = false;
+      h.fw.classList.remove('up', 'whacked', 'popping');
+    });
+
+    if (score > best) {
+      best = score;
+      bestDisplay.textContent = best;
+    }
+
+    finalScore.textContent = score;
+    gameOverScreen.classList.add('show');
+    startBtn.style.display = '';
+  }
+
+  startBtn.addEventListener('click', startGame);
+  playAgainBtn.addEventListener('click', startGame);
 </script>
 </body>
 </html>
