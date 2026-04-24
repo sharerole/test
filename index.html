@@ -21,7 +21,7 @@
 
     h1 {
       color: #FFD700;
-      font-size: 2rem;
+      font-size: clamp(1.3rem, 5vw, 2rem);
       letter-spacing: 0.1em;
       text-shadow: 0 0 20px rgba(255, 220, 50, 0.6);
       margin-bottom: 12px;
@@ -29,10 +29,10 @@
 
     #hud {
       display: flex;
-      gap: 48px;
+      gap: clamp(16px, 5vw, 48px);
       margin-bottom: 20px;
       color: #eee;
-      font-size: 1.2rem;
+      font-size: clamp(0.85rem, 3vw, 1.2rem);
     }
 
     #hud span { color: #FFD700; font-weight: bold; }
@@ -56,15 +56,15 @@
 
     #grid {
       display: grid;
-      grid-template-columns: repeat(3, 130px);
-      grid-template-rows: repeat(3, 130px);
-      gap: 20px;
+      grid-template-columns: repeat(3, min(130px, 28vw));
+      grid-template-rows: repeat(3, min(130px, 28vw));
+      gap: clamp(10px, 3vw, 20px);
     }
 
     .hole {
       position: relative;
-      width: 130px;
-      height: 130px;
+      width: min(130px, 28vw);
+      height: min(130px, 28vw);
       background: radial-gradient(ellipse at 50% 60%, #2c1a0e 60%, #1a0e08 100%);
       border-radius: 50%;
       border: 4px solid #4a2c10;
@@ -95,6 +95,8 @@
     .face-wrapper svg {
       display: block;
       filter: drop-shadow(0 0 14px rgba(255, 220, 50, 0.5));
+      width: min(110px, 24vw);
+      height: min(110px, 24vw);
     }
 
     /* particle explosion */
@@ -204,7 +206,7 @@
   const GAME_DURATION = 30;
 
   let score = 0;
-  let best = 0;
+  let best = parseInt(localStorage.getItem('whack_best') || '0', 10);
   let timeLeft = GAME_DURATION;
   let running = false;
   let timerId = null;
@@ -213,6 +215,7 @@
   const scoreDisplay    = document.getElementById('score-display');
   const timerDisplay    = document.getElementById('timer-display');
   const bestDisplay     = document.getElementById('best-display');
+  bestDisplay.textContent = best;
   const finalScore      = document.getElementById('final-score');
   const startBtn        = document.getElementById('start-btn');
   const playAgainBtn    = document.getElementById('play-again-btn');
@@ -492,7 +495,8 @@
 
     h.fw.addEventListener('transitionend', () => {
       h.fw.classList.remove('whacked');
-      if (running) scheduleNext(h, 300 + Math.random() * 600);
+      const d = difficulty();
+      if (running) scheduleNext(h, (300 - d * 180) + Math.random() * (600 - d * 400));
     }, { once: true });
 
     evt.stopPropagation();
@@ -505,6 +509,11 @@
 
   // ── pop logic ─────────────────────────────────────────────────────────────
 
+  // Returns 0 at game start, 1 at game end — used to scale speed.
+  function difficulty() {
+    return 1 - timeLeft / GAME_DURATION;
+  }
+
   function popUp(h) {
     if (!running) return;
     h.up = true;
@@ -512,7 +521,8 @@
     h.fw.classList.add('up', 'popping');
     h.fw.addEventListener('animationend', () => h.fw.classList.remove('popping'), { once: true });
 
-    const stayMs = 1200 + Math.random() * 1400;
+    const d = difficulty();
+    const stayMs = (1200 - d * 700) + Math.random() * (1400 - d * 900);
     h.timer = setTimeout(() => popDown(h), stayMs);
   }
 
@@ -520,7 +530,8 @@
     if (!h.up) return;
     h.up = false;
     h.fw.classList.remove('up', 'popping');
-    if (running) scheduleNext(h, 400 + Math.random() * 800);
+    const d = difficulty();
+    if (running) scheduleNext(h, (400 - d * 220) + Math.random() * (800 - d * 550));
   }
 
   function scheduleNext(h, delay) {
@@ -566,6 +577,7 @@
 
     if (score > best) {
       best = score;
+      localStorage.setItem('whack_best', best);
       bestDisplay.textContent = best;
     }
 
